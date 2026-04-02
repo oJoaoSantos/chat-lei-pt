@@ -13,19 +13,18 @@ Assistente jurídico especializado em **Direito Penal Português**, desenvolvido
 
 ## Aplicação
 
-🔗 [chat-lei-pt.streamlit.app](https://chat-lei-pt.streamlit.app)
+🔗 **[chat-lei-pt.streamlit.app](https://chat-lei-pt.streamlit.app)**
 
 ---
 
 ## Funcionalidades
 
 - Pesquisa semântica no **Código Penal (CP)** e **Código de Processo Penal (CPP)**
-- Respostas com citação do artigo e diploma legal, sem repetições
-- Classificação automática da questão por diploma (CP vs CPP) e tema
+- Respostas com citação dos artigos e diploma legal, sem repetições
+- Classificação automática da questão por diploma (CP vs CPP)
 - Deteção automática de cumprimentos — sem forçar legislação em conversa informal
 - Quando não encontra legislação relevante, afirma-o claramente — nunca inventa
 - Histórico de conversa com memória contextual (até 5 turnos)
-- Metadados enriquecidos por artigo (título, capítulo, secção, tema)
 - Interface de chat intuitiva para uso operacional
 
 ---
@@ -36,7 +35,7 @@ chat-lei-pt/
 ├── src/
 │   ├── __init__.py       # Módulo Python
 │   ├── ingestion.py      # Carrega PDFs, gera chunks e indexa no ChromaDB
-│   ├── retriever.py      # Pesquisa vetorial com filtros por diploma e tema
+│   ├── retriever.py      # Pesquisa vetorial com filtros por diploma
 │   ├── rag_chain.py      # Pipeline RAG com histórico de conversa
 │   └── prompts.py        # Templates de prompt especializados
 ├── assets/               # Imagens e logos
@@ -58,7 +57,7 @@ chat-lei-pt/
 |---|---|
 | Framework RAG | LangChain 0.3 |
 | LLM | OpenAI GPT-4o |
-| Embeddings | sentence-transformers/paraphrase-multilingual-mpnet-base-v2 |
+| Embeddings | intfloat/multilingual-e5-large |
 | Base de dados vetorial | ChromaDB Cloud 1.0.9 |
 | Observabilidade | LangSmith |
 | Interface | Streamlit 1.44.1 |
@@ -138,7 +137,7 @@ LANGCHAIN_PROJECT=Chat Lei PT
 
 ## Aviso Legal
 
-Este assistente é uma ferramenta de apoio à pesquisa jurídica e **não substitui aconselhamento jurídico profissional**. As respostas baseiam-se nos diplomas indexados e devem ser sempre validadas com a legislação oficial em vigor.
+Este assistente é uma ferramenta de apoio à pesquisa jurídica reaizada em contexto de testes e estudo. **Não substitui aconselhamento jurídico profissional**. As respostas baseiam-se nos diplomas indexados e devem ser sempre validadas com a legislação oficial em vigor.
 
 ---
 
