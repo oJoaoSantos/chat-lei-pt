@@ -127,11 +127,12 @@ LANGCHAIN_PROJECT=Chat Lei PT
 
 ## Exemplos de Questões
 
-- *"Um pai abandona o seu filho de 3 anos no shopping. Qual o crime?"*
-- *"Jovem de 21 anos promove bebida que provoca suicídio. Qual a moldura penal?"*
-- *"Mulher de 56 anos agride física e verbalmente um rapaz de 32 anos."*
+- *"Apanhei um homem a tentar destruir parte de um monumento, contextualiza legalmente."*
+- *"Presenciei um furto de joia numa ourivesaria."*
+- *"Mulher rouba carteira a outra mulher na via pública."*
 - *"Após prisão preventiva, pode o arguido pedir indemnização? Em que condições?"*
 - *"Quando é aplicada a caução económica?"*
+- *"Detive um individuo que conduzia alcoolizado e sem licença de condução a 130Km/h dentro de localidade"*
 
 ---
 

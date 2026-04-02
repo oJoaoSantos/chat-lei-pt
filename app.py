@@ -73,6 +73,7 @@ with st.sidebar:
         "Mulher rouba carteira a outra mulher na via pública",
         "Após prisão preventiva, pode o arguido pedir indemnização? Em que condições?",
         "Quando é aplicada a caução económica?",
+        "Detive um individuo que conduzia alcoolizado e sem licença de condução a 130Km/h dentro de localidade",
     ]
     for example in examples:
         if st.button(example, use_container_width=True):
