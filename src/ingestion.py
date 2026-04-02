@@ -5,50 +5,25 @@ from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
-from langchain_openai import ChatOpenAI
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import StrOutputParser
 
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import (
-    OPENAI_API_KEY,
     CHROMA_API_KEY,
     CHROMA_TENANT,
     CHROMA_DATABASE,
     COLLECTION_NAME,
     EMBEDDING_MODEL,
-    LLM_MODEL,
     CHUNK_SIZE,
     CHUNK_OVERLAP,
     DATA_RAW_PATH,
 )
 
-# ============================================================
-# TEMAS JURÍDICOS — lista fechada para classificação
-# ============================================================
-TEMAS_JURIDICOS = [
-    "homicídio", "ofensa à integridade física", "ameaça", "coação",
-    "sequestro", "rapto", "tráfico de pessoas", "escravidão",
-    "violação", "abuso sexual", "pornografia de menores",
-    "furto", "roubo", "extorsão", "burla", "abuso de confiança",
-    "recetação", "dano", "incêndio", "explosivos",
-    "falsificação", "contrafação", "corrupção", "peculato",
-    "tráfico de droga", "associação criminosa", "terrorismo",
-    "detenção ilegal de arma", "condução perigosa",
-    "desobediência", "resistência à autoridade",
-    "injúria", "difamação",
-    "processo penal", "prisão preventiva", "arguido", "detenção",
-    "julgamento", "recurso", "prova", "inquérito", "instrução",
-    "medidas de coação", "buscas e apreensões",
-    "outro"
-]
 
 # ============================================================
 # CHROMA CLIENT
 # ============================================================
 def get_chroma_client():
-    """Cria e devolve o cliente Chroma Cloud (API 1.0.x)."""
     return chromadb.HttpClient(
         host="api.trychroma.com",
         ssl=True,
@@ -60,6 +35,7 @@ def get_chroma_client():
         tenant=CHROMA_TENANT,
         database=CHROMA_DATABASE,
     )
+
 
 # ============================================================
 # CARREGAMENTO DE PDFs
@@ -109,93 +85,17 @@ def clean_text(text: str) -> str:
 
 
 # ============================================================
-# EXTRAÇÃO DE METADADOS ESTRUTURAIS (regex)
+# EXTRAÇÃO DE METADADOS (regex)
 # ============================================================
 def extract_legal_metadata(text: str) -> dict:
-    """
-    Extrai Título, Capítulo, Secção e Artigo do texto por regex.
-    Funciona para a estrutura do CP e CPP portugueses.
-    """
-    metadata = {
-        "titulo": "",
-        "capitulo": "",
-        "seccao": "",
-        "artigo": "",
-    }
+    """Extrai apenas source_doc e artigo — o essencial para filtros e pills."""
+    metadata = {"artigo": ""}
 
-    titulo = re.search(
-        r"(TÍTULO\s+[IVXLCDM]+[^\n]*)", text, re.IGNORECASE
-    )
-    if titulo:
-        metadata["titulo"] = titulo.group(1).strip()
-
-    capitulo = re.search(
-        r"(CAPÍTULO\s+[IVXLCDM]+[^\n]*)", text, re.IGNORECASE
-    )
-    if capitulo:
-        metadata["capitulo"] = capitulo.group(1).strip()
-
-    seccao = re.search(
-        r"(SECÇÃO\s+[IVXLCDM]+[^\n]*)", text, re.IGNORECASE
-    )
-    if seccao:
-        metadata["seccao"] = seccao.group(1).strip()
-
-    artigo = re.search(
-        r"(Artigo\s+\d+\.º[^\n]*)", text, re.IGNORECASE
-    )
+    artigo = re.search(r"(Artigo\s+\d+\.º(?:-[A-Z])?)", text, re.IGNORECASE)
     if artigo:
         metadata["artigo"] = artigo.group(1).strip()
 
     return metadata
-
-
-# ============================================================
-# CLASSIFICAÇÃO DE TEMA (LLM)
-# ============================================================
-def build_classification_chain():
-    """Constrói a chain de classificação de tema jurídico."""
-    llm = ChatOpenAI(
-        model=LLM_MODEL,
-        temperature=0,
-        api_key=OPENAI_API_KEY,
-    )
-
-    temas_str = ", ".join(TEMAS_JURIDICOS)
-
-    prompt = ChatPromptTemplate.from_template(
-        """És um especialista em direito penal português.
-Analisa o seguinte excerto de lei e classifica-o com o tema mais adequado.
-
-Responde APENAS com uma palavra ou expressão curta da lista abaixo.
-Não expliques, não uses pontuação extra.
-
-Lista de temas permitidos:
-{temas}
-
-Excerto:
-{texto}
-
-Tema:"""
-    )
-
-    return prompt | llm | StrOutputParser()
-
-
-def classify_tema(chain, text: str) -> str:
-    """Classifica o tema de um chunk. Em caso de erro devolve 'outro'."""
-    try:
-        result = chain.invoke({
-            "temas": ", ".join(TEMAS_JURIDICOS),
-            "texto": text[:800],
-        })
-        tema = result.strip().lower()
-        # Valida que o tema está na lista
-        if tema not in TEMAS_JURIDICOS:
-            tema = "outro"
-        return tema
-    except Exception:
-        return "outro"
 
 
 # ============================================================
@@ -221,41 +121,12 @@ def split_documents(documents: list) -> list:
 
     for chunk in chunks:
         chunk.page_content = clean_text(chunk.page_content)
+        legal_meta = extract_legal_metadata(chunk.page_content)
+        chunk.metadata.update(legal_meta)
 
     chunks = [c for c in chunks if len(c.page_content) > 100]
 
     print(f"  Total de chunks gerados: {len(chunks)}")
-    return chunks
-
-
-# ============================================================
-# ENRIQUECIMENTO DE METADADOS
-# ============================================================
-def enrich_metadata(chunks: list) -> list:
-    """
-    Enriquece cada chunk com:
-    - metadados estruturais (regex): titulo, capitulo, seccao, artigo
-    - tema jurídico (LLM): classificação semântica
-    """
-    print("  A construir chain de classificação...")
-    classification_chain = build_classification_chain()
-
-    total = len(chunks)
-    for i, chunk in enumerate(chunks):
-
-        # 1. Extração estrutural por regex
-        legal_meta = extract_legal_metadata(chunk.page_content)
-        chunk.metadata.update(legal_meta)
-
-        # 2. Classificação de tema com LLM
-        chunk.metadata["tema"] = classify_tema(
-            classification_chain, chunk.page_content
-        )
-
-        if (i + 1) % 50 == 0:
-            print(f"  Metadados enriquecidos: {i + 1}/{total}")
-
-    print(f"  Metadados enriquecidos: {total}/{total}")
     return chunks
 
 
@@ -268,27 +139,22 @@ def ingest(directory: str = DATA_RAW_PATH) -> None:
     print("=" * 50)
 
     # 1. Carregar PDFs
-    print("\n[1/4] A carregar PDFs...")
+    print("\n[1/3] A carregar PDFs...")
     documents = load_pdfs(directory)
     print(f"  Total de páginas: {len(documents)}")
 
-    # 2. Dividir em chunks
-    print("\n[2/4] A dividir em chunks...")
+    # 2. Dividir em chunks + metadados
+    print("\n[2/3] A dividir em chunks e extrair metadados...")
     chunks = split_documents(documents)
 
-    # 3. Enriquecer metadados
-    print("\n[3/4] A enriquecer metadados...")
-    print("  (regex + LLM — pode demorar alguns minutos)")
-    chunks = enrich_metadata(chunks)
-
-    # Mostra exemplo de metadados
-    print("\n  Exemplo de metadados do chunk 0:")
-    for k, v in chunks[0].metadata.items():
+    # Mostra exemplo
+    print("\n  Exemplo de metadados do chunk 10:")
+    for k, v in chunks[10].metadata.items():
         print(f"    {k}: {v}")
 
-    # 4. Embeddings + Chroma Cloud
-    print("\n[4/4] A gerar embeddings e a indexar no Chroma Cloud...")
-    print("  A carregar modelo local (primeira vez demora ~1 min)...")
+    # 3. Embeddings + Chroma Cloud
+    print("\n[3/3] A gerar embeddings e a indexar no Chroma Cloud...")
+    print("  A carregar modelo (primeira vez demora ~2 min)...")
 
     embeddings = HuggingFaceEmbeddings(
         model_name=EMBEDDING_MODEL,

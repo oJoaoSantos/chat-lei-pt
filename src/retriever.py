@@ -89,21 +89,16 @@ def classify_query(query: str, history: str) -> dict:
 # ============================================================
 def build_chroma_filter(classification: dict) -> dict | None:
     """
-    Constrói o filtro de metadados para o Chroma
-    com base na classificação da questão.
+    Filtra APENAS por diploma (CP ou CPP).
+    O filtro por tema foi removido — prejudicava o retrieval
+    ao excluir artigos relevantes classificados com tema diferente.
     """
-    filters = []
     diploma = classification.get("diploma", "AMBOS").upper()
 
     if diploma in ("CP", "CPP"):
-        filters.append({"source_doc": {"$eq": diploma}})
+        return {"source_doc": {"$eq": diploma}}
 
-    if len(filters) == 0:
-        return None
-    elif len(filters) == 1:
-        return filters[0]
-    else:
-        return {"$and": filters}
+    return None
 
 
 # ============================================================
@@ -113,24 +108,18 @@ def retrieve(
     query: str,
     history: str = "",
     vectorstore: Chroma = None,
+    classification: dict = None,   # recebe classificação já feita
 ) -> list:
-    """
-    Pipeline completo de retrieval:
-    1. Classifica a questão (diploma + tema)
-    2. Constrói filtro de metadados
-    3. Pesquisa vetorial no Chroma
-    4. Devolve lista de documentos relevantes
-    """
+
     print("\n[RETRIEVER]")
 
-    # 1. Classificar
-    classification = classify_query(query, history)
+    # Usa classificação recebida ou classifica agora
+    if classification is None:
+        classification = classify_query(query, history)
 
-    # 2. Filtro
     chroma_filter = build_chroma_filter(classification)
     print(f"  Filtro Chroma: {chroma_filter}")
 
-    # 3. Pesquisa
     if vectorstore is None:
         vectorstore = get_vectorstore()
 
@@ -143,7 +132,7 @@ def retrieve(
 
     print(f"  Documentos encontrados: {len(results)}")
     for doc in results:
-        artigo = doc.metadata.get("artigo", "s/artigo")
+        artigo = doc.metadata.get("artigo", "")
         diploma = doc.metadata.get("source_doc", "")
         tema = doc.metadata.get("tema", "")
         print(f"    — {diploma} | {artigo} | tema: {tema}")

@@ -1,22 +1,31 @@
-# ⚖️ Chat Lei PT
+# Chat Lei PT
 
-![Python](https://img.shields.io/badge/Python-3.13-blue?logo=python)
+![Python](https://img.shields.io/badge/Python-3.11-blue?logo=python)
 ![LangChain](https://img.shields.io/badge/LangChain-0.3.25-green?logo=chainlink)
 ![Streamlit](https://img.shields.io/badge/Streamlit-1.44.1-red?logo=streamlit)
 ![ChromaDB](https://img.shields.io/badge/ChromaDB-1.0.9-orange)
-![OpenAI](https://img.shields.io/badge/OpenAI-GPT--4o--mini-purple?logo=openai)
+![OpenAI](https://img.shields.io/badge/OpenAI-GPT--4o-purple?logo=openai)
+![LangSmith](https://img.shields.io/badge/LangSmith-Observability-yellow)
 
 Assistente jurídico especializado em **Direito Penal Português**, desenvolvido com RAG (Retrieval-Augmented Generation). Apoia agentes da **PSP e GNR** na pesquisa de legislação para elaboração de expediente policial.
+
+---
+
+## Aplicação
+
+🔗 [chat-lei-pt.streamlit.app](https://chat-lei-pt.streamlit.app)
 
 ---
 
 ## Funcionalidades
 
 - Pesquisa semântica no **Código Penal (CP)** e **Código de Processo Penal (CPP)**
-- Respostas com citação do artigo e diploma legal
-- Classificação automática da questão (CP vs CPP)
-- Histórico de conversa com memória contextual
-- Metadados enriquecidos por artigo (título, capítulo, tema)
+- Respostas com citação do artigo e diploma legal, sem repetições
+- Classificação automática da questão por diploma (CP vs CPP) e tema
+- Deteção automática de cumprimentos — sem forçar legislação em conversa informal
+- Quando não encontra legislação relevante, afirma-o claramente — nunca inventa
+- Histórico de conversa com memória contextual (até 5 turnos)
+- Metadados enriquecidos por artigo (título, capítulo, secção, tema)
 - Interface de chat intuitiva para uso operacional
 
 ---
@@ -25,16 +34,20 @@ Assistente jurídico especializado em **Direito Penal Português**, desenvolvido
 ```
 chat-lei-pt/
 ├── src/
+│   ├── __init__.py       # Módulo Python
 │   ├── ingestion.py      # Carrega PDFs, gera chunks e indexa no ChromaDB
 │   ├── retriever.py      # Pesquisa vetorial com filtros por diploma e tema
 │   ├── rag_chain.py      # Pipeline RAG com histórico de conversa
 │   └── prompts.py        # Templates de prompt especializados
 ├── assets/               # Imagens e logos
 ├── data/
-│   └── raw/              # PDFs do CP e CPP (não incluídos no repositório)
+│   └── raw/
+│       ├── cp.pdf        # Código Penal (não incluído no repositório)
+│       └── cpp.pdf       # Código de Processo Penal (não incluído no repositório)
 ├── app.py                # Interface Streamlit
 ├── config.py             # Configurações e constantes
-└── requirements.txt      # Dependências Python
+├── requirements.txt      # Dependências Python
+└── .env.example          # Exemplo de variáveis de ambiente
 ```
 
 ---
@@ -44,11 +57,11 @@ chat-lei-pt/
 | Componente | Tecnologia |
 |---|---|
 | Framework RAG | LangChain 0.3 |
-| LLM | OpenAI GPT-4o-mini |
-| Embeddings | sentence-transformers (multilingual) |
-| Base de dados vetorial | ChromaDB Cloud |
+| LLM | OpenAI GPT-4o |
+| Embeddings | sentence-transformers/paraphrase-multilingual-mpnet-base-v2 |
+| Base de dados vetorial | ChromaDB Cloud 1.0.9 |
 | Observabilidade | LangSmith |
-| Interface | Streamlit |
+| Interface | Streamlit 1.44.1 |
 | Deploy | Streamlit Community Cloud |
 
 ---
@@ -56,7 +69,7 @@ chat-lei-pt/
 ## Instalação Local
 
 ### Pré-requisitos
-- Python 3.10+
+- Python 3.11
 - Conta OpenAI com créditos disponíveis
 - Conta ChromaDB Cloud
 - PDFs do CP e CPP em `data/raw/`
@@ -64,13 +77,17 @@ chat-lei-pt/
 ### Passos
 ```bash
 # 1. Clonar o repositório
-git clone https://github.com/SEU_USERNAME/chat-lei-pt.git
+git clone https://github.com/oJoaoSantos/chat-lei-pt.git
 cd chat-lei-pt
 
 # 2. Criar ambiente virtual
 python -m venv .venv
-.venv\Scripts\activate  # Windows
-source .venv/bin/activate  # Mac/Linux
+
+# Windows
+.venv\Scripts\activate
+
+# Mac/Linux
+source .venv/bin/activate
 
 # 3. Instalar dependências
 pip install -r requirements.txt
@@ -90,7 +107,7 @@ streamlit run app.py
 
 ## Variáveis de Ambiente
 
-Cria um ficheiro `.env` na raiz do projeto:
+Cria um ficheiro `.env` na raiz do projeto com base no `.env.example`:
 ```env
 # OpenAI
 OPENAI_API_KEY=sk-proj-...
@@ -111,11 +128,17 @@ LANGCHAIN_PROJECT=Chat Lei PT
 
 ## Exemplos de Questões
 
-- *"Qual a pena para homicídio simples?"*
-- *"Quais os requisitos para uma busca domiciliária?"*
-- *"Quando se aplica a prisão preventiva?"*
-- *"O que é o crime de resistência à autoridade?"*
-- *"Em que condições pode o arguido pedir indemnização após prisão preventiva?"*
+- *"Um pai abandona o seu filho de 3 anos no shopping. Qual o crime?"*
+- *"Jovem de 21 anos promove bebida que provoca suicídio. Qual a moldura penal?"*
+- *"Mulher de 56 anos agride física e verbalmente um rapaz de 32 anos."*
+- *"Após prisão preventiva, pode o arguido pedir indemnização? Em que condições?"*
+- *"Quando é aplicada a caução económica?"*
+
+---
+
+## Aviso Legal
+
+Este assistente é uma ferramenta de apoio à pesquisa jurídica e **não substitui aconselhamento jurídico profissional**. As respostas baseiam-se nos diplomas indexados e devem ser sempre validadas com a legislação oficial em vigor.
 
 ---
 
@@ -126,5 +149,4 @@ LANGCHAIN_PROJECT=Chat Lei PT
 - [OpenAI](https://openai.com)
 - [Streamlit](https://streamlit.io)
 - [Hugging Face](https://huggingface.co) — modelos de embeddings
-
----
+- [LangSmith](https://smith.langchain.com) — observabilidade e tracing

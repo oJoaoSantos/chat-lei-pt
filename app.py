@@ -28,7 +28,8 @@ st.markdown("""
         margin: 2px;
     }
     .source-container {
-        margin-top: 8px;
+        margin-top: 4px;
+        margin-bottom: 8px;
     }
     .stChatMessage {
         border-radius: 12px;
@@ -89,20 +90,27 @@ with st.sidebar:
 # HISTÓRICO DE MENSAGENS
 # ============================================================
 for message in st.session_state.messages:
-    with st.chat_message(message["role"], avatar="assets/avatar_bot.png" if message["role"] == "assistant" else "assets/avatar_agente.png"):
+    with st.chat_message(
+        message["role"],
+        avatar="assets/avatar_bot.png" if message["role"] == "assistant" else "assets/avatar_agente.png"
+    ):
         st.markdown(message["content"])
-        if message["role"] == "assistant" and "sources" in message:
-            if message["sources"]:
-                sources_html = '<div class="source-container">'
-                for source in message["sources"]:
-                    sources_html += f'<span class="source-badge">{source}</span>'
-                sources_html += '</div>'
-                st.markdown(sources_html, unsafe_allow_html=True)
+
+        # Mostra pills do histórico
+        if (
+            message["role"] == "assistant"
+            and message.get("has_legal_context")
+            and message.get("sources")
+        ):
+            sources_html = '<div class="source-container">'
+            for source in message["sources"]:
+                sources_html += f'<span class="source-badge">{source}</span>'
+            sources_html += '</div>'
+            st.markdown(sources_html, unsafe_allow_html=True)
 
 # ============================================================
 # INPUT DO UTILIZADOR
 # ============================================================
-# Trata queries dos botões de exemplo
 if "pending_query" in st.session_state:
     query = st.session_state.pending_query
     del st.session_state.pending_query
@@ -118,7 +126,6 @@ if user_input:
 # INFERÊNCIA
 # ============================================================
 if query:
-    # Mostra mensagem do utilizador
     with st.chat_message("user", avatar="assets/avatar_agente.png"):
         st.markdown(query)
 
@@ -127,7 +134,6 @@ if query:
         "content": query,
     })
 
-    # Gera resposta
     with st.chat_message("assistant", avatar="assets/avatar_bot.png"):
         with st.spinner("A pesquisar legislação..."):
             result = inference(
@@ -138,16 +144,18 @@ if query:
 
         st.markdown(result["response"])
 
-        # Mostra fontes como badges
-        if result["sources"]:
+        # Pills logo abaixo do enquadramento legal — sem título duplicado
+        if result["has_legal_context"] and result["sources"]:
             sources_html = '<div class="source-container">'
             for source in result["sources"]:
                 sources_html += f'<span class="source-badge">{source}</span>'
             sources_html += '</div>'
             st.markdown(sources_html, unsafe_allow_html=True)
 
+    # Guarda resposta com todos os campos necessários para o histórico
     st.session_state.messages.append({
         "role": "assistant",
         "content": result["response"],
         "sources": result["sources"],
+        "has_legal_context": result["has_legal_context"],
     })

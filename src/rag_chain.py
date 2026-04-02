@@ -8,19 +8,13 @@ from langchain_chroma import Chroma
 
 from config import OPENAI_API_KEY, LLM_MODEL, TOP_K_RESULTS
 from src.prompts import RAG_PROMPT, SYSTEM_PROMPT
-from src.retriever import get_vectorstore, retrieve
+from src.retriever import get_vectorstore, retrieve, classify_query
 
 
 # ============================================================
 # HISTÓRICO DE CONVERSA
 # ============================================================
 def format_chat_history(history: list, max_turns: int = 5) -> str:
-    """
-    Converte o histórico de conversa num string legível para o LLM.
-    Limita aos últimos N turnos para não exceder o contexto.
-
-    history: lista de dicts {"role": "user"/"assistant", "content": "..."}
-    """
     if not history:
         return "Sem histórico de conversa."
 
@@ -37,15 +31,19 @@ def format_chat_history(history: list, max_turns: int = 5) -> str:
 # FORMATAR CONTEXTO DOS DOCUMENTOS
 # ============================================================
 def format_context(documents: list) -> str:
-    """
-    Formata os documentos recuperados em contexto estruturado
-    para o LLM, incluindo a referência legal de cada chunk.
-    """
     if not documents:
         return "Nenhum artigo relevante encontrado."
 
     context_parts = []
+    seen_content = set()
+
     for i, doc in enumerate(documents, 1):
+        # Evita chunks duplicados
+        content_hash = doc.page_content[:100]
+        if content_hash in seen_content:
+            continue
+        seen_content.add(content_hash)
+
         diploma = doc.metadata.get("source_doc", "")
         artigo = doc.metadata.get("artigo", "")
         tema = doc.metadata.get("tema", "")
@@ -67,7 +65,6 @@ def format_context(documents: list) -> str:
 # RAG CHAIN
 # ============================================================
 def create_rag_chain():
-    """Constrói e devolve a RAG chain."""
     llm = ChatOpenAI(
         model=LLM_MODEL,
         temperature=0,
@@ -84,18 +81,7 @@ def inference(
     chat_history: list = None,
     vectorstore: Chroma = None,
 ) -> dict:
-    """
-    Pipeline completo de inferência:
-    1. Formata o histórico de conversa
-    2. Recupera artigos relevantes (retriever)
-    3. Formata o contexto
-    4. Gera resposta com o LLM
 
-    Devolve dict com:
-        - response: resposta gerada
-        - sources: lista de fontes usadas
-        - documents: documentos recuperados
-    """
     print("=" * 50)
     print("INFERÊNCIA — ASSISTENTE JURÍDICO")
     print("=" * 50)
@@ -105,25 +91,31 @@ def inference(
     if chat_history is None:
         chat_history = []
     formatted_history = format_chat_history(chat_history)
-    print(f"  {len(chat_history)} mensagens no histórico")
 
-    # 2. Retrieval
-    print("\n[2/4] A pesquisar artigos relevantes...")
+    # 2. Classificação
+    print("\n[2/4] A classificar questão...")
+    classification = classify_query(query, formatted_history)
+    is_greeting = classification.get("is_greeting", False)
+
+    # 3. Retrieval
+    print("\n[3/4] A pesquisar artigos relevantes...")
     if vectorstore is None:
         vectorstore = get_vectorstore()
 
-    documents = retrieve(
-        query=query,
-        history=formatted_history,
-        vectorstore=vectorstore,
-    )
-
-    # 3. Contexto
-    print("\n[3/4] A formatar contexto...")
-    context = format_context(documents)
+    if is_greeting:
+        documents = []
+        print("  Cumprimento detetado — sem pesquisa jurídica")
+    else:
+        documents = retrieve(
+            query=query,
+            history=formatted_history,
+            vectorstore=vectorstore,
+            classification=classification,
+        )
 
     # 4. Geração
     print("\n[4/4] A gerar resposta...")
+    context = format_context(documents)
     chain = create_rag_chain()
     response = chain.invoke({
         "system_prompt": SYSTEM_PROMPT,
@@ -132,30 +124,40 @@ def inference(
         "query": query,
     })
 
-    # Fontes únicas para apresentar ao utilizador
-    sources = []
-    seen = set()
-    for doc in documents:
-        diploma = doc.metadata.get("source_doc", "")
-        artigo = doc.metadata.get("artigo", "")
-        if artigo and (diploma, artigo) not in seen:
-            sources.append(f"{diploma} — {artigo}")
-            seen.add((diploma, artigo))
+    # Extrai pills APENAS dos artigos mencionados na resposta gerada
+    sources = _extract_sources_from_response(response)
+    has_legal_context = len(sources) > 0 and not is_greeting
 
-    print("\n" + "=" * 50)
-    print("RESPOSTA GERADA")
-    print("=" * 50)
-    print(response)
-    print("\nFONTES:")
-    for s in sources:
-        print(f"  {s}")
+    print(f"\nFONTES EXTRAÍDAS: {sources}")
 
     return {
         "response": response,
         "sources": sources,
         "documents": documents,
+        "has_legal_context": has_legal_context,
     }
 
+# Helper
+def _extract_sources_from_response(response: str) -> list:
+    """
+    Extrai as pills diretamente do texto da resposta gerada.
+    Procura padrões como 'Artigo 131.º do CP' ou 'Artigo 202.º do CPP'.
+    Devolve lista ordenada e sem duplicados.
+    """
+    import re
+
+    pattern = r"Artigo\s+(\d+\.º(?:-[A-Z])?)\s+do\s+(CP|CPP)"
+    matches = re.findall(pattern, response)
+
+    seen = set()
+    sources = []
+    for artigo, diploma in matches:
+        key = f"{diploma} — Artigo {artigo}"
+        if key not in seen:
+            sources.append(key)
+            seen.add(key)
+
+    return sources
 
 # ============================================================
 # SINGLETON DO VECTORSTORE
@@ -163,11 +165,6 @@ def inference(
 _vectorstore = None
 
 def get_shared_vectorstore() -> Chroma:
-    """
-    Devolve uma instância partilhada do vectorstore.
-    Carrega apenas uma vez — evita recarregar o modelo
-    de embeddings a cada pergunta.
-    """
     global _vectorstore
     if _vectorstore is None:
         print("A carregar vectorstore...")
