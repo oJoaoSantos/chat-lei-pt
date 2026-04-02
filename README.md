@@ -33,7 +33,6 @@ Assistente jurídico especializado em **Direito Penal Português**, desenvolvido
 ```
 chat-lei-pt/
 ├── src/
-│   ├── __init__.py       # Módulo Python
 │   ├── ingestion.py      # Carrega PDFs, gera chunks e indexa no ChromaDB
 │   ├── retriever.py      # Pesquisa vetorial com filtros por diploma
 │   ├── rag_chain.py      # Pipeline RAG com histórico de conversa
@@ -41,12 +40,11 @@ chat-lei-pt/
 ├── assets/               # Imagens e logos
 ├── data/
 │   └── raw/
-│       ├── cp.pdf        # Código Penal (não incluído no repositório)
-│       └── cpp.pdf       # Código de Processo Penal (não incluído no repositório)
+│       ├── cp.pdf        # Código Penal 
+│       └── cpp.pdf       # Código de Processo Penal 
 ├── app.py                # Interface Streamlit
 ├── config.py             # Configurações e constantes
 ├── requirements.txt      # Dependências Python
-└── .env.example          # Exemplo de variáveis de ambiente
 ```
 
 ---
